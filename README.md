@@ -1,6 +1,6 @@
 # Tarea 3 - Procesamiento de Datos con Apache Spark y Kafka
 
-**Curso:** Big Data (202016911)  
+**Curso:** Big Data 202016911-90  
 **Universidad:** Universidad Nacional Abierta y a Distancia (UNAD)  
 **Estudiante:** Juan David Calle Ceballos  
 
