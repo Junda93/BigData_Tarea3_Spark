@@ -1,43 +1,38 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window
-from pyspark.sql.types import StructType, StructField, IntegerType, FloatType, TimestampType
-import logging
+from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# Configurar sesión de Spark y nivel de log
+# 1. Crear sesión de Spark
 spark = SparkSession.builder \
-    .appName("KafkaSparkStreaming") \
+    .appName("SparkStreamingANI") \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
 
-# Definir el esquema de entrada del mensaje JSON
+# 2. Definir el esquema según la estructura del CSV/JSON de la ANI
+# Ajusta los nombres de las columnas a los que tiene tu archivo CSV de la ANI
 schema = StructType([
-    StructField("sensor_id", IntegerType()),
-    StructField("temperature", FloatType()),
-    StructField("humidity", FloatType()),
-    StructField("timestamp", TimestampType())
+    StructField("Peaje", StringType(), True),
+    StructField("Fecha", StringType(), True),
+    StructField("Categoria", StringType(), True),
+    StructField("Valor", StringType(), True)
 ])
 
-# Configurar la lectura del flujo desde Apache Kafka
-df = spark \
-    .readStream \
+# 3. Leer la transmisión desde el nuevo tópico de Kafka
+df_kafka = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "sensor_data") \
+    .option("subscribe", "ani_peajes_topic") \
     .load()
 
-# Parsear el contenido JSON
-parsed_df = df.select(from_json(col("value").cast("string"), schema).alias("data")).select("data.*")
+# 4. Deserializar el mensaje JSON y extraer los campos
+df_parsed = df_kafka.selectExpr("CAST(value AS STRING)") \
+    .select(from_json(col("value"), schema).alias("data")) \
+    .select("data.*")
 
-# Agregación por ventana de tiempo de 1 minuto
-windowed_stats = parsed_df \
-    .groupBy(window(col("timestamp"), "1 minute"), "sensor_id") \
-    .agg({"temperature": "avg", "humidity": "avg"})
-
-# Mostrar los resultados del flujo en la consola
-query = windowed_stats \
-    .writeStream \
-    .outputMode("complete") \
+# 5. Mostrar el flujo de datos en consola en tiempo real
+query = df_parsed.writeStream \
+    .outputMode("append") \
     .format("console") \
     .start()
 
